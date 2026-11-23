@@ -27,20 +27,54 @@ try {
   await page.click('#play');
   await page.waitForFunction(() => document.getElementById('home-screen').hidden);
   await page.waitForFunction(() => window.blockCity?.telemetry().grounded === 4);
-  await page.waitForTimeout(1500);
+  // Software-rendered CI browsers can run well below real time. Measure driving
+  // intervals in fixed physics ticks instead of assuming wall time equals game time.
   const read = () => page.evaluate(() => window.blockCity.telemetry());
+  const waitForTicks = async count => {
+    const target = (await read()).tick + count;
+    await page.waitForFunction(tick => window.blockCity?.telemetry().tick >= tick, target, { timeout: 45000 });
+  };
+  const holdKeyForTicks = async (key, count) => {
+    const start = await read();
+    const target = start.tick + count;
+    let dropped = start.droppedSeconds;
+    await page.keyboard.down(key);
+    try {
+      while (true) {
+        const current = await read();
+        if (current.tick >= target) break;
+        await page.waitForFunction(tick => window.blockCity?.telemetry().tick >= tick,
+          Math.min(target, current.tick + 24), { timeout: 45000 });
+        const next = await read();
+        // A long render frame intentionally clears held game input. Press again
+        // as a player would after a stall, so the test keeps exercising driving.
+        if (next.tick < target && next.droppedSeconds > dropped + 0.0001) {
+          await page.keyboard.up(key);
+          await page.keyboard.down(key);
+        }
+        dropped = next.droppedSeconds;
+      }
+    } finally {
+      await page.keyboard.up(key);
+    }
+  };
+  await waitForTicks(180);
   const initial = await read();
   assert(initial.position.y > 0.45 && initial.position.y < 0.65);
   await page.screenshot({ path: 'artifacts/city.png' });
-  await page.keyboard.down('KeyW'); await page.waitForTimeout(2200); await page.keyboard.up('KeyW');
+  // Keep software WebGL rendering affordable on GitHub's headless runners.
+  await page.setViewportSize({ width: 640, height: 400 });
+  await waitForTicks(30);
+  await holdKeyForTicks('KeyW', 264);
   const acceleration = await read();
-  assert(acceleration.signedSpeed > 5); assert(acceleration.position.z > initial.position.z + 5);
-  await page.keyboard.down('KeyD'); await page.waitForTimeout(650); await page.keyboard.up('KeyD');
+  assert(acceleration.signedSpeed > 5, `Acceleration after ${acceleration.tick - initial.tick} ticks: ${acceleration.signedSpeed.toFixed(2)} m/s, throttle ${acceleration.throttle.toFixed(2)}, dropped ${acceleration.droppedSeconds.toFixed(2)} s`);
+  assert(acceleration.position.z > initial.position.z + 5);
+  await holdKeyForTicks('KeyD', 78);
   assert((await read()).steering > 0.05);
   await page.screenshot({ path: 'artifacts/driving.png' });
-  await page.keyboard.down('KeyS'); await page.waitForTimeout(2700); await page.keyboard.up('KeyS');
+  await holdKeyForTicks('KeyS', 324);
   const reverse = await read(); assert(reverse.signedSpeed < -0.5);
-  await page.keyboard.press('KeyR'); await page.waitForTimeout(1800);
+  await page.keyboard.press('KeyR'); await waitForTicks(216);
   const reset = await read(); assert(Math.abs(reset.position.z - initial.position.z) < 0.02); assert(Math.abs(reset.signedSpeed) < 0.02);
   await page.keyboard.press('KeyC'); assert.equal((await read()).cameraMode, 1);
   await page.keyboard.press('F3'); assert.equal((await read()).debug, true);
@@ -64,7 +98,7 @@ try {
   const final = await read();
   assert.equal(errors.length, 0, errors.join('\n'));
   assert(requests.filter(url => url.includes('/assets/')).every(url => url.includes(base)), 'All built assets use the repository subpath');
-  const report = { browser: await browser.version(), viewport: '1440x900, 800x600', initial, acceleration, reverse, reset, final, warnings, errors, requests };
+  const report = { browser: await browser.version(), viewport: '1440x900, 640x400, 800x600', initial, acceleration, reverse, reset, final, warnings, errors, requests };
   writeFileSync('artifacts/browser-validation.json', JSON.stringify(report, null, 2));
   console.log('PASS Chrome: production subpath, WASM, driving, steering, reverse, reset, cameras, debug, pause, blur, stall, compact viewport.');
   console.log(JSON.stringify({ averageFps: final.averageFps, averageStepMs: final.averageStepMs, drawCalls: final.drawCalls, warnings }));
