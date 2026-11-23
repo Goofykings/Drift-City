@@ -51,7 +51,8 @@ export const scenarios: Record<string, () => Metrics> = {
       if (!to100 && speed >= 100 / 3.6) to100 = (i + 1) * sim.dt;
     }
     const p = sim.car.body.translation();
-    assert(to50 > 2 && to50 < 6); assert(to100 > 6 && to100 < 12);
+    assert(to50 > 2 && to50 < 6, `0–50 km/h: ${to50.toFixed(3)} s`);
+    assert(to100 > 4.5 && to100 < 7.5, `0–100 km/h: ${to100.toFixed(3)} s`);
     assert(p.z > 100); assert(Math.abs(p.x) < 0.05); assert(Math.abs(sim.car.body.angvel().y) < 0.005);
     const front = sim.car.current.wheels[0].length, rear = sim.car.current.wheels[2].length;
     assert(front > rear, 'Acceleration transfers load rearward');
@@ -96,6 +97,24 @@ export const scenarios: Record<string, () => Metrics> = {
     assert(sim.car.body.angvel().y < -0.1); assert(sim.car.current.wheels[1].steering > 0);
     assert(sim.car.current.wheels[0].rotation < 0);
     return { speed_mps: sim.car.signedSpeed, yawRate_radps: sim.car.body.angvel().y };
+  }),
+  drift: () => withSim(sim => {
+    run(sim, 3); run(sim, 3, { ...neutralInput(), throttle: 1 });
+    const entrySpeed = sim.car.signedSpeed;
+    let frontSlip = 0, rearSlip = 0, marksEligible = 0;
+    for (let i = 0; i < 144; i++) {
+      sim.step({ ...neutralInput(), steering: 0.8, handbrake: true });
+      const wheels = sim.car.current.wheels;
+      frontSlip = Math.max(frontSlip, Math.abs(wheels[0].lateralSlip), Math.abs(wheels[1].lateralSlip));
+      rearSlip = Math.max(rearSlip, Math.abs(wheels[2].lateralSlip), Math.abs(wheels[3].lateralSlip));
+      marksEligible += wheels.filter(w => w.contact && Math.abs(w.lateralSlip) > ROAD_CAR.tire.driftSlipSpeed).length;
+      valid(sim);
+    }
+    assert(entrySpeed > 15 && sim.car.signedSpeed > 8, 'Handbrake slide retains useful forward speed');
+    assert(frontSlip > 2 && rearSlip > 2, 'Both axles develop measurable lateral slip');
+    assert(marksEligible > 100, 'Wheel contact persists while slipping');
+    return { entrySpeed_mps: entrySpeed, frontSlip_mps: frontSlip, rearSlip_mps: rearSlip,
+      contactSamplesOverDriftThreshold: marksEligible, exitSpeed_mps: sim.car.signedSpeed };
   }),
   suspension: () => {
     const map = flatMap();

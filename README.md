@@ -18,7 +18,7 @@ Open the localhost address printed by Vite, normally `http://127.0.0.1:5173`. In
 
 ```sh
 npm run typecheck       # strict TypeScript
-npm test                # 22 physics, clock, input, camera, and architecture checks
+npm test                # 23 physics, clock, input, camera, and architecture checks
 npm run validate:physics # numerical results -> artifacts/physics-validation.json
 npm run build           # production output -> dist/
 npm run preview         # serve dist/ locally
@@ -37,12 +37,13 @@ The browser test owns and closes its localhost server and headless browser. Scre
 | Space | Rear handbrake; cuts drive force |
 | R | Reset to a clear position above the original spawn |
 | C | Switch standard / high chase camera |
-| P | Pause / resume |
+| Esc | Pause / resume; the pause menu also has Resume and Home screen |
+| P | Alternate pause / resume shortcut |
 | F3 | Physics diagnostics and collider/contact drawing |
 
-W and S together apply the service brake. Losing window focus pauses and clears held keys; press P to resume. Long stalls discard excess time and clear stale driving inputs. Release and press a driving key again after a stall. Reset leaves the current pause state unchanged.
+W and S together apply the service brake. Losing window focus pauses and clears held keys; press Esc or Resume to continue. Long stalls discard excess time and clear stale driving inputs. Release and press a driving key again after a stall. Reset leaves the current pause state unchanged.
 
-Drive east (world +X, initially the car's right) along a cross street to reach the paved test apron at x≈115 m. It contains an 8° ramp, an 8 cm curb, three movable blocks, and a wall. The street network is open and bounded; there are no missions or menus.
+Drive east (world +X) along a cross street to reach the paved test apron at x≈115 m. It contains an 8° ramp, an 8 cm curb, three movable blocks, and a wall. The street network is open and bounded. The home screen starts the game; Esc opens the pause menu and can return home.
 
 F3 shows simulation/render rates, CPU time per physics tick, discarded time, position, velocities, steering, pedals, and each wheel's contact, length, and suspension force. Colored wireframes show the engine's actual colliders. Green lines show wheel rays and contact normals. Debug drawing uses current physics state; the normal meshes are interpolated.
 
@@ -56,7 +57,7 @@ F3 shows simulation/render rates, CPU time per physics tick, discarded time, pos
 | `src/config` | Simulation rate and documented vehicle parameters |
 | `src/input` | Timestamped key transitions, focus clearing |
 | `src/world` | Shared map data for colliders and graphics |
-| `src/rendering` | Primitive car, wheel pivots, interpolated dynamic objects, static instancing |
+| `src/rendering` | Primitive car, wheel pivots, interpolated dynamic objects, static instancing, contact-based drift effects |
 | `src/camera` | Time-based chase smoothing and sphere-cast obstruction handling |
 | `src/debug` | Engine collider and wheel-contact visualization |
 | `tests`, `tools` | Headless scenarios, browser tests, quantitative reports |
@@ -67,13 +68,13 @@ See [PHYSICS.md](PHYSICS.md) for engine selection, equations, assumptions, tunin
 
 ## GitHub Pages
 
-Nothing has been pushed or published. The project includes a **manual** deployment workflow at [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+The project includes an automatic deployment workflow at [`.github/workflows/pages.yml`](.github/workflows/pages.yml). A push to `main` runs validation and deploys the built `dist` when all checks pass. The workflow can also be started manually.
 
 For a dedicated Block City repository:
 
 1. Put the **contents of `block-city`** at the repository root, including its hidden `.github` directory. The nested workflow is intentionally inactive in the current Crossfire repository; GitHub only discovers root-level workflows.
 2. In repository **Settings → Pages → Build and deployment**, choose **GitHub Actions**.
-3. Push only when ready, then manually run **Validate and deploy Block City** from Actions. The workflow installs, tests, builds, browser-tests, and deploys `dist`.
+3. Push to `main` when ready. **Validate and deploy Block City** installs, tests, builds, browser-tests, and deploys `dist` automatically if all checks pass.
 4. The workflow uses `/<repository-name>/` as the asset base. For a user/organization root site or a custom domain, change its `BASE_PATH` to `/`.
 
 For a local repository-subpath build:
@@ -113,6 +114,6 @@ map.boxes.push(box('new-building', vec(12, 10, 18), vec(100, 5, -70), 0x77838a))
 
 ## Validation and limits
 
-On November 22, 2026, the 22 automated checks and strict production build passed. Headless Chrome also loaded the production build beneath `/block-city-test/` and passed real keyboard, reset, camera, debug, pause/resume, focus-loss, long-stall, and 800×600 layout checks, without console or network errors. Screenshots were inspected.
+On November 23, 2026, the 23 automated checks and strict production build passed with the playful tune. Headless Chrome loaded the production build beneath `/block-city-test/` and passed real keyboard, steering, contact-based drift marks and dust, reset, camera, debug, pause/home navigation, focus-loss, long-stall, and compact layout checks without console or network errors. Screenshots were inspected.
 
-This is a game vehicle foundation, not an automotive simulator. Tire grip, wheel spin, drivetrain, suspension geometry, and stock-controller roll response remain simplified. Wheel sidewalls do not collide with curbs. Dynamic road/platform momentum transfer needs a different vehicle-contact model. Firefox, Safari, mobile input, long-duration memory profiling, live GitHub Actions execution, and multiplayer synchronization remain unverified. See the detailed measurements and highest-priority improvements in [PHYSICS.md](PHYSICS.md).
+This is a game vehicle foundation, not an automotive simulator. Tire grip, wheel spin, drivetrain, suspension geometry, and stock-controller roll response remain simplified. Wheel sidewalls do not collide with curbs. Dynamic road/platform momentum transfer needs a different vehicle-contact model. Firefox, Safari, mobile input, long-duration memory profiling, this revision's live Pages deployment, and multiplayer synchronization remain unverified. See the detailed measurements and highest-priority improvements in [PHYSICS.md](PHYSICS.md).

@@ -5,6 +5,7 @@ import { Simulation } from '../physics/Simulation';
 import { KeyboardInput } from '../input/KeyboardInput';
 import { VehicleView } from '../rendering/VehicleView';
 import { WorldView } from '../rendering/WorldView';
+import { DriftEffects } from '../rendering/DriftEffects';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { PhysicsDebug } from '../debug/PhysicsDebug';
 import { length } from './math';
@@ -19,6 +20,7 @@ export class Game {
   readonly camera = new THREE.PerspectiveCamera(58, 1, 0.08, 500);
   readonly carView = new VehicleView(this.simulation.car.config);
   readonly worldView = new WorldView(this.simulation.physics);
+  readonly driftEffects = new DriftEffects(this.simulation.car.config);
   readonly chase = new ChaseCamera(this.camera, this.simulation.physics.world, this.simulation.car.body);
   readonly debug = new PhysicsDebug();
   readonly input: KeyboardInput;
@@ -38,7 +40,7 @@ export class Game {
   private readonly speedText = element('speed');
   private readonly gearText = element('gear');
   private readonly debugText = element('debug');
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, onHome: () => void) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = true;
@@ -52,7 +54,7 @@ export class Game {
     this.sun.shadow.mapSize.set(2048, 2048);
     Object.assign(this.sun.shadow.camera, { left: -42, right: 42, top: 42, bottom: -42, near: 1, far: 160 });
     this.sun.shadow.bias = -0.0005; this.sun.shadow.normalBias = 0.025;
-    this.scene.add(this.sun, this.sun.target, this.carView.root, this.worldView.root, this.debug.root);
+    this.scene.add(this.sun, this.sun.target, this.carView.root, this.worldView.root, this.driftEffects.root, this.debug.root);
     this.input = new KeyboardInput(timestamp => this.clock.tick * this.clock.dt + this.clock.alpha * this.clock.dt
       + Math.max(0, (timestamp - this.lastFrame) / 1000), key => this.action(key), () => this.setPaused(true));
     const options = { signal: this.abort.signal };
@@ -62,9 +64,10 @@ export class Game {
       element('status').hidden = false;
       element('status').textContent = 'The graphics context was lost. Reload the page to restart.';
     }, options);
-    for (const [id, key] of [['reset', 'KeyR'], ['camera', 'KeyC'], ['pause', 'KeyP'], ['debug-toggle', 'F3'], ['resume', 'KeyP']]) {
+    for (const [id, key] of [['reset', 'KeyR'], ['camera', 'KeyC'], ['pause', 'Escape'], ['debug-toggle', 'F3'], ['resume', 'Escape']]) {
       element(id).addEventListener('click', () => { this.action(key); element(id).blur(); }, options);
     }
+    element('home').addEventListener('click', onHome, options);
     this.resize();
     element('status').hidden = true;
     this.frameHandle = requestAnimationFrame(this.frame);
@@ -75,7 +78,7 @@ export class Game {
     this.camera.updateProjectionMatrix();
   }
   private action(key: string) {
-    if (key === 'KeyP') this.setPaused(!this.clock.paused);
+    if (key === 'KeyP' || key === 'Escape') this.setPaused(!this.clock.paused);
     if (key === 'KeyR') this.reset();
     if (key === 'KeyC') this.chase.toggle();
     if (key === 'F3') {
@@ -89,11 +92,12 @@ export class Game {
     this.clock.setPaused(paused); this.input.timeline.clear();
     this.simulation.syncHistory(); this.lastFrame = performance.now();
     element('pause-screen').hidden = !paused;
-    element('pause').innerHTML = `${paused ? 'Resume' : 'Pause'} <kbd>P</kbd>`;
+    element('pause').textContent = paused ? 'Resume' : 'Pause';
   }
   reset() {
     this.input.timeline.clear(); this.clock.clearDebt();
     this.simulation.car.reset(); this.simulation.syncHistory(); this.chase.reset();
+    this.driftEffects.clearTrail();
   }
   private frame = (now: number) => {
     if (this.disposed) return;
@@ -104,6 +108,7 @@ export class Game {
     const alpha = this.clock.advance(elapsed, (dt, tick) => {
       const start = performance.now();
       this.simulation.step(this.input.timeline.sample((tick + 1) * dt));
+      this.driftEffects.sample(this.simulation.car, this.simulation.car.signedSpeed);
       const cost = performance.now() - start;
       this.stepMs += (cost - this.stepMs) * 0.03;
       this.stepTimeTotal += cost; this.measuredSteps++;
@@ -111,6 +116,7 @@ export class Game {
     const renderAlpha = this.clock.paused ? 1 : alpha;
     this.carView.update(this.simulation.car, renderAlpha);
     this.worldView.update(renderAlpha);
+    this.driftEffects.update(this.clock.paused ? 0 : Math.min(elapsed, 0.1));
     this.chase.update(this.carView.root, this.simulation.car.signedSpeed, Math.min(elapsed, 0.1));
     this.sun.position.copy(this.carView.root.position).add(this.sunOffset);
     this.sun.target.position.copy(this.carView.root.position);
@@ -147,6 +153,9 @@ export class Game {
       grounded: car.groundedWheels, throttle: car.throttle, steering: car.steering, brake: car.brake,
       cameraMode: this.chase.mode, cameraPosition: this.camera.position.toArray(),
       debug: this.debug.root.visible, droppedSeconds: this.clock.droppedSeconds,
+      driftMarks: this.driftEffects.markCount,
+      dustParticles: this.driftEffects.dustCount,
+      dustEmitted: this.driftEffects.dustEmitted,
       averageFps: this.frameCount / Math.max(this.frameTimeTotal, 0.001),
       averageStepMs: this.stepTimeTotal / Math.max(this.measuredSteps, 1),
       drawCalls: this.renderer.info.render.calls, geometries: this.renderer.info.memory.geometries };

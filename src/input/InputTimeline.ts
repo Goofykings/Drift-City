@@ -20,7 +20,8 @@ export class InputTimeline {
     if (consumed) this.events.splice(0, consumed);
     this.state.throttle = Number(this.held.has('KeyW'));
     this.state.reverse = Number(this.held.has('KeyS'));
-    this.state.steering = Number(this.held.has('KeyD')) - Number(this.held.has('KeyA'));
+    // Chase view faces +Z, which places world -X on the player's screen right.
+    this.state.steering = Number(this.held.has('KeyA')) - Number(this.held.has('KeyD'));
     this.state.handbrake = this.held.has('Space');
     return this.state;
   }

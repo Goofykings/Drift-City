@@ -3,7 +3,7 @@ export interface DriverInput { throttle: number; reverse: number; steering: numb
 export const neutralInput = (): DriverInput => ({ throttle: 0, reverse: 0, steering: 0, handbrake: false });
 export interface Pose { position: Vec3; rotation: Quat }
 export interface WheelState {
-  length: number; rotation: number; steering: number; contact: boolean; force: number;
+  length: number; rotation: number; steering: number; contact: boolean; force: number; lateralSlip: number;
   hardPoint: Vec3; contactPoint: Vec3; contactNormal: Vec3;
 }
 export interface VehicleState extends Pose { wheels: WheelState[] }

@@ -6,13 +6,13 @@ import { copyPose, GROUP, groups, readPose } from '../physics/PhysicsWorld';
 import type { DriverInput, Pose, VehicleState, VehicleSystem, WheelState } from './types';
 
 const wheelState = (rest: number): WheelState => ({ length: rest, rotation: 0, steering: 0,
-  contact: false, force: 0, hardPoint: vec(), contactPoint: vec(), contactNormal: vec(0, 1, 0) });
+  contact: false, force: 0, lateralSlip: 0, hardPoint: vec(), contactPoint: vec(), contactNormal: vec(0, 1, 0) });
 const state = (rest: number): VehicleState => ({ position: vec(), rotation: identity(), wheels: Array.from({ length: 4 }, () => wheelState(rest)) });
 function copyState(from: VehicleState, to: VehicleState) {
   copyPose(from, to);
   for (let i = 0; i < 4; i++) {
     const a = from.wheels[i], b = to.wheels[i];
-    b.length = a.length; b.rotation = a.rotation; b.steering = a.steering; b.contact = a.contact; b.force = a.force;
+    b.length = a.length; b.rotation = a.rotation; b.steering = a.steering; b.contact = a.contact; b.force = a.force; b.lateralSlip = a.lateralSlip;
     Object.assign(b.hardPoint, a.hardPoint); Object.assign(b.contactPoint, a.contactPoint); Object.assign(b.contactNormal, a.contactNormal);
   }
 }
@@ -31,6 +31,7 @@ export class RaycastCar implements VehicleSystem {
   private readonly velocity = vec();
   private readonly impulse = vec();
   private readonly rotation = identity();
+  private readonly side = vec();
   private disposed = false;
 
   constructor(readonly world: RAPIER.World, readonly spawn: Pose, readonly config: VehicleConfig = ROAD_CAR) {
@@ -67,7 +68,7 @@ export class RaycastCar implements VehicleSystem {
       controller.setWheelSuspensionRelaxation(i, s.rebound);
       controller.setWheelMaxSuspensionForce(i, s.maxForce);
       controller.setWheelFrictionSlip(i, c.tire.frictionSlip);
-      controller.setWheelSideFrictionStiffness(i, c.tire.sideStiffness);
+      controller.setWheelSideFrictionStiffness(i, i < 2 ? c.tire.frontSideStiffness : c.tire.rearSideStiffness);
     });
     return controller;
   }
@@ -133,6 +134,8 @@ export class RaycastCar implements VehicleSystem {
     readPose(this.body, this.current);
     rotate(this.current.rotation, { x: 0, y: 0, z: 1 }, this.forward);
     this.body.linvel(this.velocity);
+    const angular = this.body.angvel();
+    const position = this.current.position;
     this.signedSpeed = dot(this.velocity, this.forward);
     for (let i = 0; i < 4; i++) {
       const w = this.current.wheels[i], ctl = this.controller;
@@ -144,6 +147,14 @@ export class RaycastCar implements VehicleSystem {
       ctl.wheelHardPoint(i, w.hardPoint);
       ctl.wheelContactPoint(i, w.contactPoint);
       ctl.wheelContactNormal(i, w.contactNormal);
+      if (w.contact) {
+        // Velocity at the tire patch = COM velocity + angular velocity cross radius.
+        const rx = w.contactPoint.x - position.x, ry = w.contactPoint.y - position.y, rz = w.contactPoint.z - position.z;
+        rotate(this.current.rotation, { x: Math.cos(w.steering), y: 0, z: -Math.sin(w.steering) }, this.side);
+        w.lateralSlip = (this.velocity.x + angular.y * rz - angular.z * ry) * this.side.x
+          + (this.velocity.y + angular.z * rx - angular.x * rz) * this.side.y
+          + (this.velocity.z + angular.x * ry - angular.y * rx) * this.side.z;
+      } else w.lateralSlip = 0;
     }
   }
   syncHistory() { copyState(this.current, this.previous); }

@@ -6,7 +6,7 @@ export interface VehicleConfig {
   inertia: { x: number; y: number; z: number };
   wheel: { radius: number; width: number; wheelbase: number; track: number; mountY: number };
   suspension: { restLength: number; travel: number; stiffness: number; compression: number; rebound: number; maxForce: number };
-  tire: { frictionSlip: number; sideStiffness: number };
+  tire: { frictionSlip: number; frontSideStiffness: number; rearSideStiffness: number; driftSlipSpeed: number };
   steering: { lowSpeedAngle: number; highSpeedAngle: number; transitionSpeed: number; rate: number; returnRate: number };
   drive: { maxForce: number; power: number; reverseForce: number; maxSpeed: number; reverseSpeed: number; throttleRate: number; releaseRate: number; directionThreshold: number };
   brakes: { serviceForce: number; frontShare: number; handbrakeForce: number; response: number };
@@ -28,15 +28,18 @@ export const ROAD_CAR: VehicleConfig = {
     compression: 2.8, rebound: 3.5, // s^-1: c / TOTAL mass, not N s/m.
     maxForce: 14000, // N per wheel, ~4x static load.
   },
-  tire: { frictionSlip: 1.15, sideStiffness: 1 }, // Engine tuning, not a measured tire coefficient.
+  tire: {
+    frictionSlip: 1.15, frontSideStiffness: 1, rearSideStiffness: 0.72,
+    driftSlipSpeed: 1.8, // m/s lateral contact slip for visible marks and dust.
+  }, // Stock controller tuning, not a measured tire coefficient.
   steering: {
     lowSpeedAngle: 0.55, highSpeedAngle: 0.075, // radians, center-equivalent angle before Ackermann.
     transitionSpeed: 12, // m/s, smooth inverse-quadratic blend.
     rate: 1.3, returnRate: 1.9, // rad/s.
   },
   drive: {
-    maxForce: 6500, power: 90000, reverseForce: 3600, // N total (front drive), W at wheels, N.
-    maxSpeed: 44, reverseSpeed: 9, // m/s, force taper, never a velocity clamp.
+    maxForce: 9000, power: 145000, reverseForce: 3600, // N total (front drive), W at wheels, N.
+    maxSpeed: 52, reverseSpeed: 9, // m/s, force taper, never a velocity clamp.
     throttleRate: 3, // normalized input per second.
     releaseRate: 8, // normalized input per second; close throttle faster than opening it.
     directionThreshold: 0.35, // m/s below which opposite command may engage.

@@ -25,12 +25,22 @@ try {
   await page.goto(`http://127.0.0.1:4178${base}`, { waitUntil: 'networkidle' });
   assert.equal(await page.locator('#home-title').textContent(), 'DRIFTCITY');
   assert.equal(await page.evaluate(() => window.blockCity), undefined);
+  assert.equal(await page.locator('.home-eyebrow, .home-tagline, .home-hint').count(), 0);
+  const titleBefore = await page.locator('#home-title').evaluate(title => getComputedStyle(title).transform);
+  await page.locator('#home-title').hover();
+  await page.waitForTimeout(300);
+  assert.notEqual(await page.locator('#home-title').evaluate(title => getComputedStyle(title).transform), titleBefore);
+  await page.locator('#home-title').click();
+  assert.equal(await page.evaluate(() => window.blockCity), undefined);
   await page.screenshot({ path: 'artifacts/home.png' });
   await page.locator('#play').hover();
   assert.equal(await page.locator('#play').evaluate(button => getComputedStyle(button).cursor), 'pointer');
   await page.click('#play');
   await page.waitForFunction(() => document.getElementById('home-screen').hidden);
   await page.waitForFunction(() => window.blockCity?.telemetry().grounded === 4);
+  await page.evaluate(() => document.fonts.ready);
+  assert.equal(await page.evaluate(() => document.fonts.check('700 20px Comfortaa')), true);
+  assert.equal(await page.locator('footer').count(), 0);
   // Software-rendered CI browsers can run well below real time. Measure driving
   // intervals in fixed physics ticks instead of assuming wall time equals game time.
   const read = () => page.evaluate(() => window.blockCity.telemetry());
@@ -73,7 +83,13 @@ try {
   assert(acceleration.signedSpeed > 5, `Acceleration after ${acceleration.tick - initial.tick} ticks: ${acceleration.signedSpeed.toFixed(2)} m/s, throttle ${acceleration.throttle.toFixed(2)}, dropped ${acceleration.droppedSeconds.toFixed(2)} s`);
   assert(acceleration.position.z > initial.position.z + 5);
   const turn = await holdKeyForTicks('KeyD', 78);
-  assert(turn.steering > 0.05);
+  assert(turn.steering < -0.05);
+  assert(turn.position.x < acceleration.position.x - 0.5, 'D should turn toward screen right in the chase view');
+  await page.keyboard.down('Space');
+  const drift = await holdKeyForTicks('KeyD', 120);
+  await page.keyboard.up('Space');
+  assert(drift.driftMarks > turn.driftMarks, 'Sliding wheel contact should add drift marks');
+  assert(drift.dustEmitted > turn.dustEmitted, 'Sliding wheels should emit faint dust');
   await page.screenshot({ path: 'artifacts/driving.png' });
   const reverse = await holdKeyForTicks('KeyS', 324); assert(reverse.signedSpeed < -0.5);
   await page.keyboard.press('KeyR'); await waitForTicks(216);
@@ -83,13 +99,15 @@ try {
   await page.waitForTimeout(500);
   assert.match(await page.locator('#debug').textContent(), /Grounded 4\/4/);
   await page.screenshot({ path: 'artifacts/debug.png' });
-  await page.keyboard.press('KeyP'); const paused = await read();
+  await page.keyboard.press('Escape'); const paused = await read();
   await page.waitForTimeout(400); assert.equal((await read()).tick, paused.tick);
+  assert.equal(await page.locator('#pause-screen').isVisible(), true);
+  await page.screenshot({ path: 'artifacts/pause.png' });
   await page.click('#resume'); assert.equal((await read()).paused, false);
   await page.keyboard.down('KeyW'); await page.waitForTimeout(300);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   assert.equal((await read()).paused, true); await page.keyboard.up('KeyW');
-  await page.keyboard.press('KeyP'); await page.waitForTimeout(500);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
   assert.equal((await read()).throttle, 0);
   await page.evaluate(() => { const until = performance.now() + 250; while (performance.now() < until) { /* deliberate stall */ } });
   await page.waitForTimeout(200); assert((await read()).droppedSeconds > 0.1);
@@ -100,9 +118,14 @@ try {
   const final = await read();
   assert.equal(errors.length, 0, errors.join('\n'));
   assert(requests.filter(url => url.includes('/assets/')).every(url => url.includes(base)), 'All built assets use the repository subpath');
-  const report = { browser: await browser.version(), viewport: '1440x900, 480x320, 800x600', initial, acceleration, reverse, reset, final, warnings, errors, requests };
+  await page.keyboard.press('Escape');
+  await page.click('#home');
+  assert.equal(await page.locator('#home-screen').isVisible(), true);
+  assert.equal(await page.evaluate(() => window.blockCity), undefined);
+  assert.equal(await page.locator('#play').isEnabled(), true);
+  const report = { browser: await browser.version(), viewport: '1440x900, 480x320, 800x600', initial, acceleration, turn, drift, reverse, reset, final, warnings, errors, requests };
   writeFileSync('artifacts/browser-validation.json', JSON.stringify(report, null, 2));
-  console.log(`PASS ${channel}: production subpath, WASM, driving, steering, reverse, reset, cameras, debug, pause, blur, stall, compact viewport.`);
+  console.log(`PASS ${channel}: production subpath, WASM, driving, steering, reverse, reset, cameras, debug, pause menu, home return, blur, stall, compact viewport.`);
   console.log(JSON.stringify({ averageFps: final.averageFps, averageStepMs: final.averageStepMs, drawCalls: final.drawCalls, warnings }));
 } catch (error) {
   const telemetry = page ? await page.evaluate(() => window.blockCity?.telemetry()).catch(() => undefined) : undefined;

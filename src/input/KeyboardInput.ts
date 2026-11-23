@@ -1,6 +1,6 @@
 import { InputTimeline, type DriveKey } from './InputTimeline';
 const driveKeys = new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space']);
-const actionKeys = new Set(['KeyR', 'KeyC', 'KeyP', 'F3']);
+const actionKeys = new Set(['KeyR', 'KeyC', 'KeyP', 'Escape', 'F3']);
 export class KeyboardInput {
   readonly timeline = new InputTimeline();
   private readonly abort = new AbortController();

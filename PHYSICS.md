@@ -1,6 +1,6 @@
 # Physics foundation
 
-Implementation and measurements: November 22, 2026. This document describes the delivered model, including behavior that should be replaced before treating it as a realistic tire simulator.
+Implementation: November 22, 2026. Game tuning and measurements updated November 23, 2026. This document describes the delivered model, including behavior that should be replaced before treating it as a realistic tire simulator.
 
 ## Engine selection
 
@@ -27,7 +27,7 @@ The general [determinism guide](https://rapier.rs/docs/user_guides/javascript/de
 
 ## Units, axes, and ownership
 
-Meters, kilograms, seconds, radians; gravity is `(0, -9.81, 0)` m/s². Local +Y is up, +Z is the nose, +X is right. Front-left/front-right/rear-left/rear-right are wheel indices 0/1/2/3. Suspension points downward. Axles point -X; ground normal crossed with axle gives +Z forward. Positive steering rotates toward +X. Tests check forward movement, reverse movement, yaw signs, and wheel rotation signs.
+Meters, kilograms, seconds, radians; gravity is `(0, -9.81, 0)` m/s². Local +Y is up, +Z is the nose, +X is right. Front-left/front-right/rear-left/rear-right are wheel indices 0/1/2/3. Suspension points downward. Axles point -X; ground normal crossed with axle gives +Z forward. Positive physics steering rotates toward +X. The chase camera looks along +Z, so the player key mapping sends D toward world -X for screen-right movement. Tests check forward movement, reverse movement, yaw signs, and wheel rotation signs; the browser check also confirms screen-right steering.
 
 No velocity or orientation assignments occur during ordinary driving. The only application-generated chassis impulse is aerodynamic drag. Rapier applies the tire/suspension impulses. Explicit reset can move the chassis and clear velocities. There is no auto-upright, yaw shortcut, horizontal velocity override, anti-roll correction, or speed clamp.
 
@@ -49,9 +49,9 @@ The map's broad phase is populated before the first vehicle query. Body mass pro
 
 ### Why 120 Hz
 
-Both 60 and 120 Hz passed the settling/comparison scenario. At 60 Hz measured static sag was 0.091833 m; at 120 Hz it was 0.095917 m against the 0.100 m static estimate. The selected rate halves this discrepancy and samples fast wheel contacts twice as often. The 20-second acceleration/braking/coast sequence ended at z=85.262 m versus 85.019 m, respectively. These rates need not give identical discretized trajectories.
+Both 60 and 120 Hz passed the settling/comparison scenario. At 60 Hz measured static sag was 0.091833 m; at 120 Hz it was 0.095917 m against the 0.100 m static estimate. The selected rate halves this discrepancy and samples fast wheel contacts twice as often. With the updated drive tune, the 20-second acceleration/braking/coast sequence ended at z=196.146 m versus 195.701 m, respectively. These rates need not give identical discretized trajectories.
 
-In the local short Node benchmark, average tick costs were 0.0135 ms at 60 Hz and 0.0158 ms at 120 Hz (single-car flat fixture, JIT and machine dependent). Full browser measurements are below. The higher update rate was affordable here; it is a tested engineering choice, not a universal performance claim.
+In the updated local short Node benchmark, average tick costs were about 0.012 ms at 60 Hz and 0.011 ms at 120 Hz (single-car flat fixture, JIT and machine dependent). Full browser measurements are below. The higher update rate was affordable here; it is a tested engineering choice, not a universal performance claim.
 
 ## Chassis, mass, and inertia
 
@@ -75,7 +75,9 @@ Measured static load is 3433.500 N per wheel, sag 0.095917 m, and settled height
 
 ## Tire model and roll limitation
 
-`frictionSlip=1.15` limits stock tire impulses relative to suspension load; `sideFrictionStiffness=1` scales lateral correction. These are engine parameters, **not** a measured rubber-road coefficient or a Pacejka tire. The source uses an anisotropic combined impulse limit (forward term weighted 0.5, lateral term 1). Wheel rotation is derived from contact motion, with per-tick airborne decay; it is not an independently integrated wheel inertia or clutch model.
+`frictionSlip=1.15` limits stock tire impulses relative to suspension load; front `sideFrictionStiffness=1` and rear `sideFrictionStiffness=0.72` scale lateral correction. The softer rear correction makes handbrake turns easier to slide. These are engine parameters, **not** measured rubber-road coefficients or a Pacejka tire. The source uses an anisotropic combined impulse limit (forward term weighted 0.5, lateral term 1). Wheel rotation is derived from contact motion, with per-tick airborne decay; it is not an independently integrated wheel inertia or clutch model.
+
+The visual drift effect measures lateral speed at each tire contact using `v + ω × r`, projected onto that wheel's steered side axis. When contact, ground normal, speed, and lateral slip exceed the configured thresholds, the renderer traces the wheel's reported contact path and emits short-lived dust. Marks are bounded to the newest 1800 segments and are cosmetic only. Contact samples precede body integration by up to one fixed tick; stock rays have no physical wheel volume. The marks therefore track this raycast model's contact points, not a measured tire patch, and do not alter road friction.
 
 Two material limitations in the stock implementation matter especially: its private `roll_influence=0.1` reduces the lever arm of lateral tire force, and tire/suspension reactions are not fully returned to dynamic ground bodies. Both remain inherited approximations, not extra project assists. Body roll exists but is understated. Chassis-to-prop contact uses the normal rigid-body solver; driving on movable platforms is not momentum-complete. [Pinned source](https://github.com/dimforge/rapier/blob/v0.36.0/src/control/ray_cast_vehicle_controller.rs).
 
@@ -85,7 +87,7 @@ All road surfaces currently share the tire tune. Collider friction controls **ch
 
 Keyboard steering is rate-limited in radians per simulation second: 1.3 rad/s toward input and 1.9 rad/s on return. Center steering limit blends from 0.55 rad at rest toward 0.075 rad using an inverse-quadratic function with 12 m/s transition scale. This is an explicit configurable keyboard assist, not a steering-rack law. Front-wheel Ackermann angles follow wheelbase/track geometry; the inner wheel turns farther. No chassis yaw assignment is used. Reverse retains the same wheel steering sign and naturally reverses yaw response.
 
-The simplified front-wheel drivetrain supplies up to 6500 N total, limited by 90 kW at the wheels (`F=P/v` above the force-limited range). Reverse has a 3600 N limit. Throttle rises at 3/s and releases at 8/s. Drive force tapers over the final 15% below 44 m/s forward and 9 m/s reverse. Speed can exceed these values externally (e.g. downhill); the implementation never clamps velocity. No gearbox, differential, tire spin inertia, ABS, or traction-control system is claimed.
+The simplified front-wheel drivetrain supplies up to 9000 N total, limited by 145 kW at the wheels (`F=P/v` above the force-limited range). Reverse has a 3600 N limit. Throttle rises at 3/s and releases at 8/s. Drive force tapers over the final 15% below 52 m/s forward and 9 m/s reverse. Speed can exceed these values externally (e.g. downhill); the implementation never clamps velocity. No gearbox, differential, tire spin inertia, ABS, or traction-control system is claimed.
 
 The opposite-direction command requests service braking until longitudinal speed falls below 0.35 m/s; it never instantly reverses the body. Maximum service force is 12.5 kN, 65% front, with a 6/s input response. Rear handbrake capacity is 9 kN total, and drive force is cut while braking. A requested brake setting is converted to N s using fixed `dt`, as required by the installed API. W+S requests the service brake without direction engagement.
 
@@ -105,36 +107,37 @@ Listeners use abort signals; animation callbacks stop on disposal; controls/cont
 
 ## Numerical validation
 
-Run `npm test`, then `npm run validate:physics` to regenerate `artifacts/physics-validation.json`. These are simulation outcomes, not real-car calibration. Node 24.20.0, Rapier 0.21.0; primary tests use 120 Hz. Tolerances are regression envelopes for an ordinary dry-road game car, not safety/performance certification.
+Run `npm test`, then `npm run validate:physics` to regenerate `artifacts/physics-validation.json`. These are simulation outcomes, not real-car calibration. Node 24.20.0, Rapier 0.21.0; primary tests use 120 Hz. Tolerances are regression envelopes for a playful road car, not safety/performance certification.
 
 | Scenario | Measured result | Acceptance / interpretation |
 | --- | --- | --- |
 | Rest after settling | 0 m horizontal drift and height range across the next 10 s; four contacts | <1 cm drift; <5 mm height variation |
 | Static compression | 0.095917 m on all wheels; 3433.500 N each | 0.08–0.12 m vs 0.10 m reference |
-| Acceleration | 0–50 km/h: 3.25 s; 0–100: 8.208 s | 2–6 s and 6–12 s; smooth speed increase |
+| Acceleration | 0–50 km/h: 2.375 s; 0–100: 5.358 s | 2–6 s and 4.5–7.5 s; smooth speed increase |
 | Straight tracking | ~0.000001 m lateral drift after 10 s throttle | <0.05 m; no unexplained yaw |
-| Braking | 50.049 km/h to 0.35 m/s in 11.658 m / 1.575 s | 9–22 m / 1–3 s; this is a near-stop threshold, not exact zero |
+| Braking | 50.066 km/h to 0.35 m/s in 11.669 m / 1.575 s | 9–22 m / 1–3 s; this is a near-stop threshold, not exact zero |
 | Braking load transfer | Front sag 0.1360 m; rear 0.0554 m | Front compresses relative to rear |
-| Low-speed right turn | 4.845 m/s, 0.4837 rad center steering, ~4.964 m instantaneous radius | Radius estimate `speed/yawRate`; 3–20 m envelope |
-| Reverse steering | -5.121 m/s; yaw -1.026 rad/s with positive steering | Correct opposing yaw sign |
-| One-wheel 8 cm bump | 0.0800 m left/right suspension difference; lengths 0.1816–0.3272 m | Independent travel and no chassis penetration in this fixture |
-| Ramp | 0.483 s airborne; peak COM height 2.002 m; settles on four wheels | >0.15 s flight; landing stable |
-| Flight force check | All contactless tire impulses/load zero; max vertical acceleration deviation 0.0154 m/s² from gravity | <0.2 m/s², allowing air drag |
-| Wall | ~17.80 m/s approach; COM stays before z=40 wall | No tunneling; bounded finite states |
+| Low-speed right turn | 6.889 m/s, 0.4327 rad center steering, ~5.592 m instantaneous radius | Radius estimate `speed/yawRate`; 3–20 m envelope |
+| Reverse steering | -5.117 m/s; yaw -1.017 rad/s with positive steering | Correct opposing yaw sign |
+| Handbrake slide | 17.723 m/s entry, 13.828 m/s exit after 1.2 s; peak front/rear lateral contact slip 3.874/3.267 m/s | Both axles slip above 2 m/s with ground contact retained |
+| One-wheel 8 cm bump | 0.0800 m left/right suspension difference; lengths 0.1817–0.3245 m | Independent travel and no chassis penetration in this fixture |
+| Ramp | 0.567 s airborne; peak COM height 2.088 m; settles on four wheels | >0.15 s flight; landing stable |
+| Flight force check | All contactless tire impulses/load zero; max vertical acceleration deviation 0.0194 m/s² from gravity | <0.2 m/s², allowing air drag |
+| Wall | ~20.97 m/s approach; COM stays before z=40 wall | No tunneling; bounded finite states |
 | CCD stress | Initial 80 m/s crash into 0.25 m wall remains on approach side | Isolated stress initial condition, beyond normal drive speed |
-| Movable block | 65 kg box moves 10.964 m; peak speed 7.710 m/s | Real chassis collision response, no teleporting |
+| Movable block | 65 kg box moves 19.021 m; peak speed 10.946 m/s | Real chassis collision response, no teleporting |
 | 30/60/144 FPS schedules | 1440 physics steps each; maximum state difference 0 | Tolerance 1e-6 for position, quaternion, velocity in this runtime |
-| Extended city driving | 180 s, repeated pedals/turns/obstacles and 5 explicit resets; max speed 16.888 m/s, angular speed 2.274 rad/s | Finite states; <100 m/s and <50 rad/s |
+| Extended city driving | 180 s, repeated pedals/turns/obstacles and 5 explicit resets; max speed 20.429 m/s, angular speed 3.363 rad/s | Finite states; <100 m/s and <50 rad/s |
 | Reset | 51 resets; one chassis remains, final height 0.544083 m | No duplicate bodies/controller corruption; separately checks occupied spawn |
-| Coasting | 16.895 → 16.290 m/s across 3 s | Slows naturally while retaining most momentum |
+| Coasting | 22.621 → 21.865 m/s across 3 s | Slows naturally while retaining most momentum |
 | Handbrake/recovery | Parks near zero; corner-and-service-brake sequence returns upright/usable | No instantaneous speed assignment |
-| Force-taper speed | 148.83 km/h after 45 s throttle | 35–44.2 m/s envelope, no velocity cap |
+| Force-taper speed | 176.18 km/h after 45 s throttle | 35–52.2 m/s envelope, no velocity cap |
 
-Additional checks verify effective inertia axes, gravity/sleeping of a prop, interpolation immutability and shortest quaternion arc, bounded stalls/pause, timestamped input clearing, camera obstruction, and independent operation/disposal of two controllers. Total: **22 passing automated tests**.
+Additional checks verify effective inertia axes, gravity/sleeping of a prop, interpolation immutability and shortest quaternion arc, bounded stalls/pause, timestamped input clearing, camera obstruction, and independent operation/disposal of two controllers. Total: **23 passing automated tests**.
 
-`npm run test:browser` separately built at `/block-city-test/` and ran Chrome 157.0.8103.79 at 1440×900 and 800×600. WASM startup, asset paths, actual W/S/D/R/C/P/F3 input, button controls, pause/resume, blur clearing, a deliberate 250 ms stall, and layout checks passed without console/network errors. City, driving, debug, and compact screenshots were inspected. This run averaged **57.81 render FPS** and **0.236 ms per physics tick**, with 57 reported main render calls at completion. Debugging, screenshots, and the deliberate stall are part of this short run; this is not an isolated GPU benchmark or a guarantee on other hardware.
+`npm run test:browser` separately built at `/block-city-test/` and ran Chrome 157.0.8103.79 at 1440×900, 480×320, and 800×600. WASM startup, local Comfortaa asset paths, actual driving keys and Escape input, steering direction, pause/home navigation, hundreds of drift mark segments and dozens of emitted dust particles, blur clearing, a deliberate 250 ms stall, and layout checks passed without console/network errors. Home, city, driving, pause, debug, and compact screenshots were inspected. This run averaged about **59 render FPS** and **0.2 ms per physics tick**, with 59 reported main render calls at completion. Debugging, screenshots, and the deliberate stall are part of this short run; this is not an isolated GPU benchmark or a guarantee on other hardware.
 
-GitHub Actions/Pages configuration is supplied but was not run remotely. The local production-subpath test validates static loading, not account permissions or a live deployment. Firefox, Safari, mobile, controller hardware, cross-platform determinism, extreme terrain, many vehicles, and hour-scale stability remain unverified.
+The earlier Pages workflow ran remotely, but this game revision has only been validated locally. The local production-subpath test validates static loading, not a live deployment of these changes. Firefox, Safari, mobile, controller hardware, cross-platform determinism, extreme terrain, many vehicles, and hour-scale stability remain unverified.
 
 ## Tuning guidance and next work
 
