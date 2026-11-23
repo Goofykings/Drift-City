@@ -1,7 +1,10 @@
 name: Validate and deploy Block City
 
-# Manual only. Place this project at the root of its own repository before enabling Pages.
+# Place this project at the root of its own repository before enabling Pages.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:

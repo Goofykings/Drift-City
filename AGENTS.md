@@ -12,4 +12,4 @@
 - Reset recreates its controller and clears interpolation/input state. Dispose controllers before bodies/world; release GPU objects and listeners. Debug rendering must not accumulate GPU buffers.
 - Run `npm test` and `npm run build` for dynamics changes. Run `npm run validate:physics` for updated measured values, and `npm run test:browser` for input/rendering/deployment changes. Investigate failures before changing tolerances. Keep test fixtures physically interpretable.
 - Exact dependency versions and lockfile are intentional. Re-run the full physics suite after upgrading Rapier. Standard compat is not an enhanced-determinism multiplayer guarantee.
-- Keep deployment manual. Do not push, publish, or run the Pages deployment without explicit user authorization. The included workflow is for this project at the root of its own repository.
+- Deploy automatically on pushes to main. Do not push, publish, or manually run the Pages deployment without explicit user authorization. The included workflow is for this project at the root of its own repository.
