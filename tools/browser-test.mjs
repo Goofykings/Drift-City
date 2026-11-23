@@ -6,14 +6,18 @@ import { chromium } from 'playwright';
 const base = '/block-city-test/';
 const outDir = 'artifacts/subpath-dist';
 mkdirSync('artifacts', { recursive: true });
-let browser, server;
+let browser, server, page;
+const errors = [], requests = [], warnings = [];
 try {
   await build({ base, build: { outDir }, logLevel: 'warn' });
   server = await preview({ base, build: { outDir }, preview: { host: '127.0.0.1', port: 4178, strictPort: true } });
   const channel = process.env.BROWSER_CHANNEL || 'chrome';
   browser = await chromium.launch({ channel: channel === 'chromium' ? undefined : channel, headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
-  const errors = [], requests = [], warnings = [];
+  page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  if (process.env.BROWSER_CPU_THROTTLE) {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.BROWSER_CPU_THROTTLE) });
+  }
   page.on('pageerror', error => errors.push(String(error)));
   page.on('requestfailed', request => errors.push(`${request.url()} ${request.failure()?.errorText}`));
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); requests.push(response.url()); });
@@ -42,7 +46,7 @@ try {
     try {
       while (true) {
         const current = await read();
-        if (current.tick >= target) break;
+        if (current.tick >= target) return current;
         await page.waitForFunction(tick => window.blockCity?.telemetry().tick >= tick,
           Math.min(target, current.tick + 24), { timeout: 45000 });
         const next = await read();
@@ -63,17 +67,15 @@ try {
   assert(initial.position.y > 0.45 && initial.position.y < 0.65);
   await page.screenshot({ path: 'artifacts/city.png' });
   // Keep software WebGL rendering affordable on GitHub's headless runners.
-  await page.setViewportSize({ width: 640, height: 400 });
+  await page.setViewportSize({ width: 480, height: 320 });
   await waitForTicks(30);
-  await holdKeyForTicks('KeyW', 264);
-  const acceleration = await read();
+  const acceleration = await holdKeyForTicks('KeyW', 264);
   assert(acceleration.signedSpeed > 5, `Acceleration after ${acceleration.tick - initial.tick} ticks: ${acceleration.signedSpeed.toFixed(2)} m/s, throttle ${acceleration.throttle.toFixed(2)}, dropped ${acceleration.droppedSeconds.toFixed(2)} s`);
   assert(acceleration.position.z > initial.position.z + 5);
-  await holdKeyForTicks('KeyD', 78);
-  assert((await read()).steering > 0.05);
+  const turn = await holdKeyForTicks('KeyD', 78);
+  assert(turn.steering > 0.05);
   await page.screenshot({ path: 'artifacts/driving.png' });
-  await holdKeyForTicks('KeyS', 324);
-  const reverse = await read(); assert(reverse.signedSpeed < -0.5);
+  const reverse = await holdKeyForTicks('KeyS', 324); assert(reverse.signedSpeed < -0.5);
   await page.keyboard.press('KeyR'); await waitForTicks(216);
   const reset = await read(); assert(Math.abs(reset.position.z - initial.position.z) < 0.02); assert(Math.abs(reset.signedSpeed) < 0.02);
   await page.keyboard.press('KeyC'); assert.equal((await read()).cameraMode, 1);
@@ -98,10 +100,14 @@ try {
   const final = await read();
   assert.equal(errors.length, 0, errors.join('\n'));
   assert(requests.filter(url => url.includes('/assets/')).every(url => url.includes(base)), 'All built assets use the repository subpath');
-  const report = { browser: await browser.version(), viewport: '1440x900, 640x400, 800x600', initial, acceleration, reverse, reset, final, warnings, errors, requests };
+  const report = { browser: await browser.version(), viewport: '1440x900, 480x320, 800x600', initial, acceleration, reverse, reset, final, warnings, errors, requests };
   writeFileSync('artifacts/browser-validation.json', JSON.stringify(report, null, 2));
-  console.log('PASS Chrome: production subpath, WASM, driving, steering, reverse, reset, cameras, debug, pause, blur, stall, compact viewport.');
+  console.log(`PASS ${channel}: production subpath, WASM, driving, steering, reverse, reset, cameras, debug, pause, blur, stall, compact viewport.`);
   console.log(JSON.stringify({ averageFps: final.averageFps, averageStepMs: final.averageStepMs, drawCalls: final.drawCalls, warnings }));
+} catch (error) {
+  const telemetry = page ? await page.evaluate(() => window.blockCity?.telemetry()).catch(() => undefined) : undefined;
+  console.error('Browser test diagnostics:', JSON.stringify({ telemetry, errors, warnings }));
+  throw error;
 } finally {
   await browser?.close();
   if (server) await new Promise(resolve => server.httpServer.close(resolve));
