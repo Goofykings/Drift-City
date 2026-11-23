@@ -1,10 +1,34 @@
-:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f1f5f6; background: #182129; font-synthesis: none; }
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f1f5f6; background: #152c47; font-synthesis: none; }
 * { box-sizing: border-box; }
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
 canvas { display: block; width: 100%; height: 100%; }
 button { color: inherit; font: inherit; font-size: .875rem; border: 1px solid #ffffff25; border-radius: 5px; background: #19242bde; padding: 9px 12px; cursor: pointer; }
 button:hover { background: #344651; }
 button:focus-visible { outline: 2px solid #f1c46a; outline-offset: 3px; }
+body:not(.playing) .game-ui { display: none !important; }
+#home-screen { position: absolute; inset: 0; isolation: isolate; overflow: hidden; display: grid; place-items: center; text-align: center; background: radial-gradient(circle at 50% 57%, #ffcc83 0, #fb936e 26%, #986d91 54%, #263f65 100%); }
+#home-screen::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(#12294100 45%, #172b49aa 75%, #0b2035 100%); }
+.home-sun { position: absolute; width: min(45vw, 510px); aspect-ratio: 1; top: 12%; left: 50%; transform: translateX(-50%); border-radius: 50%; background: linear-gradient(#ffe7a2, #ffad83 75%); box-shadow: 0 0 75px 25px #ffd39180; opacity: .92; }
+.home-skyline { position: absolute; bottom: 17%; left: -2%; width: 104%; height: 31%; background: #263b61; clip-path: polygon(0 74%, 5% 74%, 5% 51%, 8% 51%, 8% 67%, 12% 67%, 12% 32%, 15% 32%, 15% 60%, 20% 60%, 20% 43%, 24% 43%, 24% 72%, 29% 72%, 29% 48%, 33% 48%, 33% 19%, 36% 19%, 36% 57%, 42% 57%, 42% 36%, 46% 36%, 46% 70%, 51% 70%, 51% 40%, 54% 40%, 54% 26%, 58% 26%, 58% 63%, 64% 63%, 64% 43%, 69% 43%, 69% 69%, 73% 69%, 73% 29%, 77% 29%, 77% 56%, 82% 56%, 82% 39%, 86% 39%, 86% 65%, 92% 65%, 92% 48%, 96% 48%, 96% 76%, 100% 76%, 100% 100%, 0 100%); box-shadow: 0 -15px 30px #20345344; }
+.home-skyline::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 16px, #f7b67a88 17px 19px, transparent 20px 34px), repeating-linear-gradient(0deg, transparent 0 19px, #f7b67a77 20px 23px, transparent 24px 42px); opacity: .45; }
+.home-road { position: absolute; bottom: -1px; left: 0; width: 100%; height: 21%; background: linear-gradient(#1b304c, #0b1c2e); clip-path: polygon(39% 0, 61% 0, 100% 100%, 0 100%); }
+.home-road::after { content: ''; position: absolute; top: 0; left: 49.5%; width: 1%; height: 100%; background: repeating-linear-gradient(#ffd890 0 18px, transparent 18px 36px); transform: perspective(120px) rotateX(36deg); transform-origin: top; opacity: .7; }
+.home-content { position: relative; z-index: 1; width: min(92vw, 850px); margin-top: -4vh; animation: home-enter .7s cubic-bezier(.2,.8,.2,1) both; }
+.home-eyebrow { margin: 0 0 1rem; color: #fff1d8; text-transform: uppercase; letter-spacing: .38em; font-size: clamp(.65rem, 1.5vw, .9rem); font-weight: 800; text-shadow: 0 2px 10px #42294b; }
+.bubble-title { display: flex; flex-direction: column; align-items: center; margin: 0; font-family: ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; font-size: clamp(5rem, 14vw, 10.5rem); font-weight: 1000; line-height: .84; letter-spacing: -.075em; transform: rotate(-4deg); filter: drop-shadow(0 18px 16px #16263a88); }
+.bubble-title span { display: block; padding: 0 .15em .13em; color: #ffe9ac; -webkit-text-stroke: .025em #fff5d1; paint-order: stroke fill; text-shadow: 0 .025em #ffc477, 0 .05em #ee9067, 0 .075em #db6b68, 0 .1em #b64e68, 0 .125em #7d3b67, .035em .16em #4a315f; }
+.bubble-title span + span { margin-top: -.12em; color: #ffd08b; }
+.home-tagline { margin: .6rem 0 1.8rem; font-size: clamp(.95rem, 2vw, 1.2rem); font-weight: 700; letter-spacing: .04em; text-shadow: 0 2px 8px #25324c; }
+.play-button { display: inline-flex; align-items: center; justify-content: center; gap: 1.4rem; min-width: 220px; padding: 15px 25px; border: 3px solid #fff3ce; border-radius: 999px; color: #322b50; background: linear-gradient(#ffe9a8, #ffc16d); box-shadow: 0 7px 0 #ad5c65, 0 14px 22px #17233f80, inset 0 3px 0 #fff9e3; font-size: 1.45rem; font-weight: 1000; letter-spacing: .12em; transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
+.play-button:hover { background: linear-gradient(#fff5ca, #ffce79); transform: translateY(-5px) scale(1.05); box-shadow: 0 12px 0 #ad5c65, 0 20px 28px #17233f80, inset 0 3px 0 #fff; filter: brightness(1.05); }
+.play-button:active, .play-button.is-starting { transform: translateY(5px) scale(.97); box-shadow: 0 2px 0 #ad5c65, 0 5px 12px #17233f80, inset 0 2px 0 #fff9e3; }
+.play-button:disabled { cursor: progress; }
+.play-arrow { font-size: 1.4rem; line-height: 1; transition: transform .18s ease; }
+.play-button:hover .play-arrow { transform: translateX(5px); }
+.home-hint { margin: 1.4rem 0 0; color: #fff2d6; font-size: .82rem; font-weight: 700; letter-spacing: .06em; text-shadow: 0 2px 8px #17233f; }
+.home-hint span { padding: 0 .45rem; }
+@keyframes home-enter { from { opacity: 0; transform: translateY(24px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .home-content { animation: none; } .play-button, .play-arrow { transition: none; } }
 kbd { font: inherit; font-size: .75rem; color: #dee7eb; border: 1px solid #ffffff38; border-radius: 3px; padding: 2px 5px; margin-left: 3px; }
 .brand { position: absolute; left: 24px; top: 22px; display: flex; flex-direction: column; gap: 4px; text-shadow: 0 1px 6px #000a; pointer-events: none; }
 .brand strong { font-size: 1.2rem; letter-spacing: .12em; }
@@ -26,6 +50,10 @@ footer span { white-space: nowrap; }
 #pause-screen p { color: #c4d1d8; margin: 12px 0 24px; }
 [hidden] { display: none !important; }
 @media (max-width: 850px) {
+  .home-sun { width: 65vw; top: 20%; }
+  .home-content { margin-top: -1vh; }
+  .bubble-title { font-size: clamp(4.3rem, 17vw, 8rem); }
+  .home-road { height: 17%; }
   .brand { left: 15px; top: 15px; } .brand span, .test-hint { display: none; }
   .tools { top: 58px; left: 15px; right: auto; }
   footer { gap: 12px; flex-wrap: wrap; padding: 13px; }

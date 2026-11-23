@@ -19,6 +19,13 @@ try {
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); requests.push(response.url()); });
   page.on('console', message => { if (message.type() === 'warning') warnings.push(message.text()); if (message.type() === 'error') errors.push(message.text()); });
   await page.goto(`http://127.0.0.1:4178${base}`, { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('#home-title').textContent(), 'DRIFTCITY');
+  assert.equal(await page.evaluate(() => window.blockCity), undefined);
+  await page.screenshot({ path: 'artifacts/home.png' });
+  await page.locator('#play').hover();
+  assert.equal(await page.locator('#play').evaluate(button => getComputedStyle(button).cursor), 'pointer');
+  await page.click('#play');
+  await page.waitForFunction(() => document.getElementById('home-screen').hidden);
   await page.waitForFunction(() => window.blockCity?.telemetry().grounded === 4);
   await page.waitForTimeout(1500);
   const read = () => page.evaluate(() => window.blockCity.telemetry());

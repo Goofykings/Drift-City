@@ -3,25 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#182129" />
-    <meta name="description" content="Block City: a small, physics-first driving playground." />
-    <title>Block City</title>
+    <meta name="theme-color" content="#152c47" />
+    <meta name="description" content="Drift City: a driving playground." />
+    <title>Drift City</title>
     <link rel="icon" href="data:," />
   </head>
   <body>
-    <canvas id="game" aria-label="Block City driving game. Use W A S D to drive; P to pause."></canvas>
-    <header class="brand"><strong>BLOCK CITY</strong><span>A driving playground</span></header>
-    <aside class="tools" aria-label="Game controls">
+    <canvas id="game" aria-label="Drift City driving game. Use W A S D to drive; P to pause."></canvas>
+    <main id="home-screen" aria-labelledby="home-title">
+      <div class="home-sun" aria-hidden="true"></div>
+      <div class="home-skyline" aria-hidden="true"></div>
+      <div class="home-road" aria-hidden="true"></div>
+      <div class="home-content">
+        <p class="home-eyebrow">A driving playground</p>
+        <h1 id="home-title" class="bubble-title"><span>DRIFT</span><span>CITY</span></h1>
+        <p class="home-tagline">Your city. Your road. Your ride.</p>
+        <button id="play" class="play-button" type="button"><span>PLAY</span><span class="play-arrow" aria-hidden="true">➜</span></button>
+        <p class="home-hint">WASD to drive <span aria-hidden="true">·</span> Space to drift</p>
+      </div>
+    </main>
+    <header class="brand game-ui"><strong>DRIFT CITY</strong><span>A driving playground</span></header>
+    <aside class="tools game-ui" aria-label="Game controls">
       <button id="reset" title="Reset vehicle (R)">Reset <kbd>R</kbd></button>
       <button id="camera" title="Switch camera (C)">Camera <kbd>C</kbd></button>
       <button id="pause" title="Pause (P)">Pause <kbd>P</kbd></button>
       <button id="debug-toggle" aria-pressed="false" title="Physics diagnostics (F3)">Debug <kbd>F3</kbd></button>
     </aside>
-    <section id="status" role="status"><strong>Starting Block City</strong><span>Loading the physics engine…</span></section>
-    <section id="pause-screen" hidden><div><h1>Paused</h1><p>Take a moment. The city can wait.</p><button id="resume">Resume driving <kbd>P</kbd></button></div></section>
-    <div id="telemetry"><span id="gear">N</span><strong id="speed">0</strong><span>km/h</span></div>
-    <footer><span><kbd>W</kbd> Accelerate</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>Space</kbd> Handbrake</span><span class="test-hint">Test apron east of the city</span></footer>
-    <pre id="debug" hidden></pre>
+    <section id="status" role="status" hidden></section>
+    <section id="pause-screen" class="game-ui" hidden><div><h1>Paused</h1><p>Take a moment. The city can wait.</p><button id="resume">Resume driving <kbd>P</kbd></button></div></section>
+    <div id="telemetry" class="game-ui"><span id="gear">N</span><strong id="speed">0</strong><span>km/h</span></div>
+    <footer class="game-ui"><span><kbd>W</kbd> Accelerate</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>Space</kbd> Handbrake</span><span class="test-hint">Test apron east of the city</span></footer>
+    <pre id="debug" class="game-ui" hidden></pre>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
